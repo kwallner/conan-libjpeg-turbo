@@ -111,7 +111,7 @@ CONAN_BASIC_SETUP()
 
     def package_info(self):
         # Naming scheme is strange: Only Mingw is using the static extension
-        if self.settings.os == "Windows" and self.settings.compiler == "gcc" and not self.options.shared:
+        if self.settings.os == "Windows" and self.settings.compiler == "Visual Studio" and not self.options.shared:
             self.cpp_info.libs = ['jpeg-static', 'turbojpeg-static']
         else:
             self.cpp_info.libs = ['jpeg', 'turbojpeg']
