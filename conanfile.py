@@ -1,20 +1,16 @@
-from conans import ConanFile, ConfigureEnvironment
 import os
-from conans.tools import download
-from conans.tools import unzip, replace_in_file
-from conans import CMake
-
+from conans import ConanFile, CMake, tools
 
 class LibJpegTurboConan(ConanFile):
     name = "libjpeg-turbo"
-    version = "1.5.1"
+    version = "1.5.3"
     ZIP_FOLDER_NAME = "%s-%s" % (name, version)
     generators = "cmake", "txt"
     settings = "os", "arch", "compiler", "build_type"
     options = {"shared": [True, False], "fPIC": [True, False], "SSE": [True, False]}
     default_options = "shared=False", "fPIC=True", "SSE=True"
     exports = "CMakeLists.txt"
-    url="http://github.com/lasote/libjpeg-turbo"
+    url="http://github.com/kwallner/conan-libjpeg-turbo"
     license="https://github.com/libjpeg-turbo/libjpeg-turbo/blob/%s/LICENSE.txt" % version
     
     def config(self):
@@ -29,16 +25,14 @@ class LibJpegTurboConan(ConanFile):
        
     def source(self):
         zip_name = "%s.tar.gz" % self.ZIP_FOLDER_NAME
-        download("http://downloads.sourceforge.net/project/libjpeg-turbo/%s/%s" % (self.version, zip_name), zip_name)
-        unzip(zip_name)
+        tools.download("http://downloads.sourceforge.net/project/libjpeg-turbo/%s/%s" % (self.version, zip_name), zip_name)
+        tools.unzip(zip_name)
         os.unlink(zip_name)
 
     def build(self):
         """ Define your project building. You decide the way of building it
             to reuse it later in any other project.
         """
-        env = ConfigureEnvironment(self)
-
         if self.settings.os == "Linux" or self.settings.os == "Macos":
             if self.options.fPIC:
                 env_line = env.command_line.replace('CFLAGS="', 'CFLAGS="-fPIC ')
@@ -65,12 +59,12 @@ class LibJpegTurboConan(ConanFile):
     include(../conanbuildinfo.cmake)
     CONAN_BASIC_SETUP()
     '''
-            replace_in_file("%s/CMakeLists.txt" % self.ZIP_FOLDER_NAME, "cmake_minimum_required(VERSION 2.8.11)", conan_magic_lines)
-            replace_in_file("%s/CMakeLists.txt" % self.ZIP_FOLDER_NAME, "project(libjpeg-turbo C)", "")
+            tools.replace_in_file("%s/CMakeLists.txt" % self.ZIP_FOLDER_NAME, "cmake_minimum_required(VERSION 2.8.11)", conan_magic_lines)
+            tools.replace_in_file("%s/CMakeLists.txt" % self.ZIP_FOLDER_NAME, "project(libjpeg-turbo C)", "")
             
             # Don't mess with runtime conan already set
-            replace_in_file("%s/CMakeLists.txt" % self.ZIP_FOLDER_NAME, 'string(REGEX REPLACE "/MD" "/MT" ${var} "${${var}}")', "")
-            replace_in_file("%s/sharedlib/CMakeLists.txt" % self.ZIP_FOLDER_NAME, 'string(REGEX REPLACE "/MT" "/MD" ${var} "${${var}}")', "")
+            tools.replace_in_file("%s/CMakeLists.txt" % self.ZIP_FOLDER_NAME, 'string(REGEX REPLACE "/MD" "/MT" ${var} "${${var}}")', "")
+            tools.replace_in_file("%s/sharedlib/CMakeLists.txt" % self.ZIP_FOLDER_NAME, 'string(REGEX REPLACE "/MT" "/MD" ${var} "${${var}}")', "")
             
             cmake_options = []
             if self.options.shared == True:
@@ -79,12 +73,12 @@ class LibJpegTurboConan(ConanFile):
                 cmake_options.append("-DENABLE_SHARED=0 -DENABLE_STATIC=1")
             cmake_options.append("-DWITH_SIMD=%s" % "1" if self.options.SSE else "0")
             
-            cmake = CMake(self.settings)
+            cmake = CMake(self)
             self.run("cd %s && mkdir _build" % self.ZIP_FOLDER_NAME)
             cd_build = "cd %s/_build" % self.ZIP_FOLDER_NAME
 
-            self.run('%s && %s && cmake .. %s %s' % (env.command_line, cd_build, cmake.command_line, " ".join(cmake_options)))
-            self.run("%s && %s && cmake --build . %s" % (env.command_line, cd_build, cmake.build_config))
+            self.run('%s && cmake .. %s %s' % (cd_build, cmake.command_line, " ".join(cmake_options)))
+            self.run("%s && cmake --build . %s" % (cd_build, cmake.build_config))
                 
     def package(self):
         """ Define your conan structure: headers, libs, bins and data. After building your
