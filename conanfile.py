@@ -25,7 +25,7 @@ class LibJpegTurboConan(ConanFile):
        
     def source(self):
         zip_name = "%s.tar.gz" % self.ZIP_FOLDER_NAME
-        tools.download("http://downloads.sourceforge.net/project/libjpeg-turbo/%s/%s" % (self.version, zip_name), zip_name)
+        tools.download("http://downloads.sourceforge.net/project/libjpeg-turbo/%s/%s" % (self.version, zip_name), zip_name, verify=False)
         tools.unzip(zip_name)
         os.unlink(zip_name)
 
@@ -34,25 +34,28 @@ class LibJpegTurboConan(ConanFile):
             to reuse it later in any other project.
         """
         if self.settings.os == "Linux" or self.settings.os == "Macos":
-            if self.options.fPIC:
-                env_line = env.command_line.replace('CFLAGS="', 'CFLAGS="-fPIC ')
-            else:
-                env_line = env.command_line
-            self.run("cd %s && autoreconf -fiv" % self.ZIP_FOLDER_NAME)
-            config_options = ""
+
+            fpic_flag= "-fPIC" if self.options.fPIC else "";
+
+	    # Skip this ... is it needed?
+            #self.run("cd %s && autoreconf -fiv" % self.ZIP_FOLDER_NAME)
+            
+	    config_options = ""
             if self.settings.arch == "x86":
                 if self.settings.os == "Linux":
-                    config_options = "--host i686-pc-linux-gnu CFLAGS='-O3 -m32' LDFLAGS=-m32"
+                    config_options = "--host i686-pc-linux-gnu CFLAGS='-O3 -m32 %s' LDFLAGS='-m32 %s'" % (fpic_flag, fpic_flag)
                 else:
-                    config_options = "--host i686-apple-darwin CFLAGS='-O3 -m32' LDFLAGS=-m32"
+                    config_options = "--host i686-apple-darwin CFLAGS='-O3 -m32 %s' LDFLAGS='-m32 %s'" % (fpic_flag, fpic_flag)
+	    else:
+		config_options = "CFLAGS='-O3 %s' LDFLAGS='%s'" % (fpic_flag, fpic_flag)
 
             if self.settings.os == "Macos":
                 old_str = '-install_name \$rpath/\$soname'
                 new_str = '-install_name \$soname'
                 replace_in_file("./%s/configure" % self.ZIP_FOLDER_NAME, old_str, new_str)
 
-            self.run("cd %s && %s ./configure %s" % (self.ZIP_FOLDER_NAME, env_line, config_options))
-            self.run("cd %s && %s make" % (self.ZIP_FOLDER_NAME, env_line))
+            self.run("cd %s && ./configure %s" % (self.ZIP_FOLDER_NAME, config_options))
+            self.run("cd %s && make" % (self.ZIP_FOLDER_NAME))
         else:
             conan_magic_lines = '''project(libjpeg-turbo)
     cmake_minimum_required(VERSION 2.8.11)
