@@ -44,6 +44,9 @@ CONAN_BASIC_SETUP()
             tools.replace_in_file("%s/CMakeLists.txt" % self.ZIP_FOLDER_NAME, 'string(REGEX REPLACE "/MD" "/MT" ${var} "${${var}}")', "")
             tools.replace_in_file("%s/sharedlib/CMakeLists.txt" % self.ZIP_FOLDER_NAME, 'string(REGEX REPLACE "/MT" "/MD" ${var} "${${var}}")', "")
 
+            # Fix install
+            tools.replace_in_file("%s/CMakeLists.txt" % self.ZIP_FOLDER_NAME, 'install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/', 'install(PROGRAMS ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/')
+            
     def build(self):
         """ Define your project building. You decide the way of building it
             to reuse it later in any other project.
@@ -52,17 +55,17 @@ CONAN_BASIC_SETUP()
 
             fpic_flag= "-fPIC" if self.options.fPIC else "";
 
-	    # Skip this ... is it needed?
+            # Skip this ... is it needed?
             #self.run("cd %s && autoreconf -fiv" % self.ZIP_FOLDER_NAME)
             
-	    config_options = ""
+            config_options = ""
             if self.settings.arch == "x86":
                 if self.settings.os == "Linux":
                     config_options = "--host i686-pc-linux-gnu CFLAGS='-O3 -m32 %s' LDFLAGS='-m32 %s'" % (fpic_flag, fpic_flag)
                 else:
                     config_options = "--host i686-apple-darwin CFLAGS='-O3 -m32 %s' LDFLAGS='-m32 %s'" % (fpic_flag, fpic_flag)
-	    else:
-		config_options = "CFLAGS='-O3 %s' LDFLAGS='%s'" % (fpic_flag, fpic_flag)
+            else:
+                config_options = "CFLAGS='-O3 %s' LDFLAGS='%s'" % (fpic_flag, fpic_flag)
 
             if self.settings.os == "Macos":
                 old_str = '-install_name \$rpath/\$soname'
@@ -72,32 +75,32 @@ CONAN_BASIC_SETUP()
             self.run("cd %s && ./configure %s" % (self.ZIP_FOLDER_NAME, config_options))
             self.run("cd %s && make" % (self.ZIP_FOLDER_NAME))
         else:
-            cmake_options = []
-            if self.options.shared == True:
-                cmake_options.append("-DENABLE_STATIC=0 -DENABLE_SHARED=1")
-            else:
-                cmake_options.append("-DENABLE_SHARED=0 -DENABLE_STATIC=1")
-            cmake_options.append("-DWITH_SIMD=%s" % "1" if self.options.SSE else "0")
-            
             cmake = CMake(self)
+            
+            if self.options.shared:
+                cmake.definitions["ENABLE_STATIC"] = "0"
+                cmake.definitions["ENABLE_SHARED"] = "1"
+            else:
+                cmake.definitions["ENABLE_STATIC"] = "1"
+                cmake.definitions["ENABLE_SHARED"] = "0"
+            
+            cmake.definitions["WITH_SIMD"] = "1" if self.options.SSE else "0"
+            
             cmake.configure(source_dir="%s" % self.ZIP_FOLDER_NAME)
-            cmake.build()
+            cmake.build()            
+            cmake.install()
                 
     def package(self):
         """ Define your conan structure: headers, libs, bins and data. After building your
             project, this method is called to create a defined structure:
         """
-        # Copying headers
+        # Copying headers ... also for cmake as some are missing
         self.copy("*.h", "include", "%s" % (self.ZIP_FOLDER_NAME), keep_path=False)
-
+        self.copy("jconfig.h", "include", ".", keep_path=False)
+        self.copy("jconfigint.h", "include", ".", keep_path=False)
+            
         # Copying static and dynamic libs
-        if self.settings.os == "Windows":
-            if self.options.shared:
-                self.copy(pattern="*.dll", dst="bin", src=self.ZIP_FOLDER_NAME, keep_path=False)
-                self.copy(pattern="*turbojpeg.lib", dst="lib", src=self.ZIP_FOLDER_NAME, keep_path=False)
-                self.copy(pattern="*jpeg.lib", dst="lib", src=self.ZIP_FOLDER_NAME, keep_path=False)
-            self.copy(pattern="*jpeg-static.lib", dst="lib", src=self.ZIP_FOLDER_NAME, keep_path=False)
-        else:
+        if self.settings.os != "Windows":
             if self.options.shared:
                 if self.settings.os == "Macos":
                     self.copy(pattern="*.dylib", dst="lib", keep_path=False)
@@ -107,10 +110,8 @@ CONAN_BASIC_SETUP()
                 self.copy(pattern="*.a", dst="lib", src=self.ZIP_FOLDER_NAME, keep_path=False)
 
     def package_info(self):
-        if self.settings.os == "Windows":
-            if self.options.shared:
-                self.cpp_info.libs = ['jpeg', 'turbojpeg']
-            else:
-                self.cpp_info.libs = ['jpeg-static', 'turbojpeg-static']
+        # Naming scheme is strange: Only Mingw is using the static extension
+        if self.settings.os == "Windows" and self.settings.compiler == "gcc" and not self.options.shared:
+            self.cpp_info.libs = ['jpeg-static', 'turbojpeg-static']
         else:
             self.cpp_info.libs = ['jpeg', 'turbojpeg']
