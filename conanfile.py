@@ -28,6 +28,21 @@ class LibJpegTurboConan(ConanFile):
         tools.download("http://downloads.sourceforge.net/project/libjpeg-turbo/%s/%s" % (self.version, zip_name), zip_name)
         tools.unzip(zip_name)
         os.unlink(zip_name)
+        
+        if self.settings.os == "Linux" or self.settings.os == "Macos":
+            pass
+        else:
+            conan_magic_lines = '''project(libjpeg-turbo)
+cmake_minimum_required(VERSION 2.8.11)
+include(../conanbuildinfo.cmake)
+CONAN_BASIC_SETUP()
+'''
+            tools.replace_in_file("%s/CMakeLists.txt" % self.ZIP_FOLDER_NAME, "cmake_minimum_required(VERSION 2.8.11)", conan_magic_lines)
+            tools.replace_in_file("%s/CMakeLists.txt" % self.ZIP_FOLDER_NAME, "project(libjpeg-turbo C)", "")
+            
+            # Don't mess with runtime conan already set
+            tools.replace_in_file("%s/CMakeLists.txt" % self.ZIP_FOLDER_NAME, 'string(REGEX REPLACE "/MD" "/MT" ${var} "${${var}}")', "")
+            tools.replace_in_file("%s/sharedlib/CMakeLists.txt" % self.ZIP_FOLDER_NAME, 'string(REGEX REPLACE "/MT" "/MD" ${var} "${${var}}")', "")
 
     def build(self):
         """ Define your project building. You decide the way of building it
@@ -54,18 +69,6 @@ class LibJpegTurboConan(ConanFile):
             self.run("cd %s && %s ./configure %s" % (self.ZIP_FOLDER_NAME, env_line, config_options))
             self.run("cd %s && %s make" % (self.ZIP_FOLDER_NAME, env_line))
         else:
-            conan_magic_lines = '''project(libjpeg-turbo)
-    cmake_minimum_required(VERSION 2.8.11)
-    include(../conanbuildinfo.cmake)
-    CONAN_BASIC_SETUP()
-    '''
-            tools.replace_in_file("%s/CMakeLists.txt" % self.ZIP_FOLDER_NAME, "cmake_minimum_required(VERSION 2.8.11)", conan_magic_lines)
-            tools.replace_in_file("%s/CMakeLists.txt" % self.ZIP_FOLDER_NAME, "project(libjpeg-turbo C)", "")
-            
-            # Don't mess with runtime conan already set
-            tools.replace_in_file("%s/CMakeLists.txt" % self.ZIP_FOLDER_NAME, 'string(REGEX REPLACE "/MD" "/MT" ${var} "${${var}}")', "")
-            tools.replace_in_file("%s/sharedlib/CMakeLists.txt" % self.ZIP_FOLDER_NAME, 'string(REGEX REPLACE "/MT" "/MD" ${var} "${${var}}")', "")
-            
             cmake_options = []
             if self.options.shared == True:
                 cmake_options.append("-DENABLE_STATIC=0 -DENABLE_SHARED=1")
@@ -74,11 +77,8 @@ class LibJpegTurboConan(ConanFile):
             cmake_options.append("-DWITH_SIMD=%s" % "1" if self.options.SSE else "0")
             
             cmake = CMake(self)
-            self.run("cd %s && mkdir _build" % self.ZIP_FOLDER_NAME)
-            cd_build = "cd %s/_build" % self.ZIP_FOLDER_NAME
-
-            self.run('%s && cmake .. %s %s' % (cd_build, cmake.command_line, " ".join(cmake_options)))
-            self.run("%s && cmake --build . %s" % (cd_build, cmake.build_config))
+            cmake.configure(source_dir="%s" % self.ZIP_FOLDER_NAME)
+            cmake.build()
                 
     def package(self):
         """ Define your conan structure: headers, libs, bins and data. After building your
