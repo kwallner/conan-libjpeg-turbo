@@ -16,6 +16,8 @@ class DefaultNameConan(ConanFile):
     settings = "os", "compiler", "arch", "build_type"
     generators = "cmake"
     requires = "libjpeg-turbo/1.5.3@%s/%s" % (username, channel)
+    options = {"shared": [True, False]}
+    default_options = "shared=False"
 
     def build(self):
         cmake = CMake(self)
