@@ -20,8 +20,7 @@ class LibJpegTurboConan(ConanFile):
             pass
         
         if self.settings.os == "Windows":
-            self.requires.add("nasm/2.12.02@lasote/stable", private=True)
-            self.options.remove("fPIC")
+            self.requires.add("nasm/2.12.02@lasote/stable", "private")
        
     def source(self):
         zip_name = "%s.tar.gz" % self.ZIP_FOLDER_NAME
@@ -84,6 +83,7 @@ CONAN_BASIC_SETUP()
                 cmake.definitions["ENABLE_STATIC"] = "1"
                 cmake.definitions["ENABLE_SHARED"] = "0"
             
+            cmake.definitions["CMAKE_POSITION_INDEPENDENT_CODE"] = self.options.shared or self.options.fPIC
             cmake.definitions["WITH_SIMD"] = "1" if self.options.SSE else "0"
             
             cmake.configure(source_dir="%s" % self.ZIP_FOLDER_NAME)
